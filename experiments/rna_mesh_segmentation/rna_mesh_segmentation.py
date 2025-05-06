@@ -5,6 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
+import open3d as o3d  # 确保安装了 open3d 库
+import matplotlib.pyplot as plt
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add the path to the DiffusionNet src
 import diffusion_net
@@ -44,10 +46,13 @@ augment_random_rotate = (input_features == 'xyz')
 # Important paths
 base_path = os.path.dirname(__file__)
 op_cache_dir = os.path.join(base_path, "data", "op_cache")
-pretrain_path = os.path.join(base_path, "pretrained_models/rna_mesh_seg_{}_4x128.pth".format(input_features))
+#pretrain_path = os.path.join(base_path, "pretrained_models/rna_mesh_seg_{}_4x128.pth".format(input_features))
+pretrain_path = os.path.join(base_path, "data/saved_models/rna_mesh_seg_{}_4x128.pth".format(input_features))
 model_save_path = os.path.join(base_path, "data/saved_models/rna_mesh_seg_{}_4x128.pth".format(input_features))
 dataset_path = os.path.join(base_path, "data/RNA-Surface-Segmentation-Dataset")
 
+print("pretrain_path: ", pretrain_path)
+print("model_save_path: ", model_save_path)
 
 # === Load datasets
 
@@ -159,7 +164,7 @@ def test():
     total_num = 0
     with torch.no_grad():
     
-        for data in tqdm(test_loader):
+        for i, data in enumerate(tqdm(test_loader)):
 
             verts, faces, frames, mass, L, evals, evecs, gradX, gradY, labels = data
 
@@ -190,6 +195,24 @@ def test():
             this_num = labels.shape[0]
             correct += this_correct
             total_num += this_num
+
+            # Save the results as a .ply file
+            verts_np = verts.cpu().numpy()
+            faces_np = faces.cpu().numpy()
+            pred_labels_np = pred_labels.cpu().numpy()
+
+            # Create Open3D mesh
+            mesh = o3d.geometry.TriangleMesh()
+            mesh.vertices = o3d.utility.Vector3dVector(verts_np)
+            mesh.triangles = o3d.utility.Vector3iVector(faces_np)
+            mesh.vertex_colors = o3d.utility.Vector3dVector(
+                np.array([plt.cm.jet(label / n_class)[:3] for label in pred_labels_np])
+            )
+
+            # Save to .ply
+            output_path = os.path.join(base_path, f"test_out/test_output_{i}.ply")
+            o3d.io.write_triangle_mesh(output_path, mesh)
+            print(f"Saved visualization to {output_path}")
 
     test_acc = correct / total_num
     return test_acc 
