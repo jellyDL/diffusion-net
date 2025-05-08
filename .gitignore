@@ -53,3 +53,6 @@ pyrightconfig.json
 *.exe
 *.out
 *.app
+
+op_cache
+test_out
