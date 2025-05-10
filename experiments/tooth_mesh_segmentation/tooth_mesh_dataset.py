@@ -32,7 +32,7 @@ class ToothMeshDataset(Dataset):
                 label_file = os.path.join(self.root_dir, "labels", f[:-4] + ".txt")
 
                 verts, faces = pp3d.read_mesh(mesh_file)
-                labels = torch.tensor(np.loadtxt(label_file).astype(int))
+                labels = torch.tensor(np.loadtxt(label_file).astype(int)) + 1
 
                 verts = diffusion_net.geometry.normalize_positions(torch.tensor(verts).float())
                 faces = torch.tensor(faces)
