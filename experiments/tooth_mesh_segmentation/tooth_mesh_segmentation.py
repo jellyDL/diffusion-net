@@ -314,7 +314,7 @@ if __name__ == "__main__":
             
             train_acc = train_epoch(epoch)
             test_acc = test()
-            print("Epoch {} - Train overall: {:06.3f}%  Test overall: {:06.2f}%".format(epoch, 100*train_acc, 100*test_acc))
+            print("Epoch {} - Train overall: {:06.3f}%  Test overall: {:06.3f}%".format(epoch, 100*train_acc, 100*test_acc))
             if test_acc > test_acc_ref:
                 test_acc_ref = test_acc
                 model_tmp_save_path = os.path.join(base_path, \
