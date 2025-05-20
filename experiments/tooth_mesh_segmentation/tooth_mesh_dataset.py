@@ -55,8 +55,10 @@ class ToothMeshDataset(Dataset):
             self.gradY_list = []
             self.name_list = []
 
-            print("Loading meshes...",len(files))
-            for f in files:
+            print("### Loading Meshes ...", len(files))
+            for idx, f in enumerate(files):
+                if idx % 10 == 0:
+                    print(f"Loading mesh {idx+1}/{len(files)}...")
                 mesh_file = os.path.join(self.root_dir, "meshes", f)
                 label_file = os.path.join(self.root_dir, "labels", f[:-4] + ".txt")
 

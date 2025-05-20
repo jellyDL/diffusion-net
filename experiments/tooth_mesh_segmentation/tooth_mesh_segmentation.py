@@ -14,6 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add th
 import diffusion_net
 from tooth_mesh_dataset import ToothMeshDataset
 import random
+import getpass
 
 fdi_colors_map = {
     0: [228, 228, 228],
@@ -51,69 +52,6 @@ fdi_colors_map = {
     48: [255, 102, 217],
 }
  
-# === Options
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--evaluate", action="store_true", help="evaluate using the pretrained model")
-parser.add_argument("--input_features", type=str, help="what features to use as input ('xyz' or 'hks') default: hks", default='xyz')
-args = parser.parse_args()
-
-# System settings
-device = torch.device('cuda:0')
-dtype = torch.float32
-
-# Problem settings
-n_class = 64  # 牙齿分割有10个类别
-input_features = args.input_features
-k_eig = 128
-
-# Training settings
-train = not args.evaluate
-n_epoch = 500
-lr = 1e-3
-decay_every = 10
-decay_rate = 0.8
-augment_random_rotate = (input_features == 'xyz')
-
-# Paths
-base_path = os.path.dirname(__file__)
-op_cache_dir = os.path.join(base_path, "data", "op_cache")
-pretrain_path = os.path.join(base_path, "data/saved_models/tooth_mesh_seg_{}_6x128.pth".format(input_features))
-model_save_path = os.path.join(base_path, "data/saved_models/tooth_mesh_seg_{}_6x128.pth".format(input_features))
-dataset_path = os.path.join(base_path, "/home/wangjialei/Datasets/Teeth3DS+_dataset")
-
-# === Load datasets
-
-# test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
-# test_loader = DataLoader(test_dataset, batch_size=None)
-
-# if train:
-#     train_dataset = ToothMeshDataset(dataset_path, train=True, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
-#     print("Train dataset size: ", len(train_dataset))
-#     train_loader = DataLoader(train_dataset, batch_size=None, shuffle=True)
-
-# === Create the model
-
-C_in = {'xyz': 3, 'hks': 16}[input_features]
-
-model = diffusion_net.layers.DiffusionNet(C_in=C_in,
-                                          C_out=n_class,
-                                          C_width=128,
-                                          # N_block=4,
-                                          N_block=6,
-                                          last_activation=lambda x: torch.nn.functional.log_softmax(x, dim=-1),
-                                          outputs_at='vertices',
-                                          dropout=True)
-
-model = model.to(device)
-
-if not train:
-    print("Loading pretrained model from: " + str(pretrain_path))
-    model.load_state_dict(torch.load(pretrain_path))
-
-# === Optimize
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
 def train_epoch(epoch):
 
     # Implement lr decay
@@ -277,46 +215,118 @@ def ramdom_dataset_file(dataset_path, train_num=30, test_num=10):
         f.writelines(selected_lines)
     print("### Test.txt (first 5 lines):")
     print("\n".join(line.strip() for line in selected_lines[:5]))
+
+
+if __name__ == "__main__":
+    # === Options
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--evaluate", action="store_true", help="evaluate using the pretrained model")
+    parser.add_argument("--input_features", type=str, help="what features to use as input ('xyz' or 'hks') default: hks", default='xyz')
+    parser.add_argument("--C_width", type=int, default=128)
+    parser.add_argument("--N_block", type=int, default=4)
+    args = parser.parse_args()
+
+    # System settings
+    device = torch.device('cuda:0')
+    dtype = torch.float32
+
+    # Problem settings
+    n_class = 64  # 牙齿分割有10个类别
+    input_features = args.input_features
+    k_eig = 128
+
+    # Training settings
+    train = not args.evaluate
+    n_epoch = 500
+    lr = 1e-3
+    decay_every = 10
+    decay_rate = 0.8
+    augment_random_rotate = (input_features == 'xyz')
+    c_width = args.C_width
+    n_block = args.N_block
+
+    # Paths
+    base_path = os.path.dirname(__file__)
+    op_cache_dir = os.path.join(base_path, "data", "op_cache")
+    save_dir = os.path.join(base_path, "data", "saved_models")
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir, exist_ok=True)
+    pretrain_path = os.path.join(save_dir, "tooth_mesh_seg_{}_{}x{}.pth".format(input_features, c_width, n_block))
+    model_save_path = os.path.join(save_dir, "tooth_mesh_seg_{}_{}x{}.pth".format(input_features, c_width, n_block))
+    username = getpass.getuser()
+    dataset_path = os.path.join(base_path, f"/home/{username}/Datasets/Teeth3DS+_dataset")
     
-if train:
-    print("Training...")
+    print("Dataset path: ", dataset_path)
 
-    # 检查是否存在之前保存的模型
-    if os.path.exists(model_save_path):
-        print(f"Loading existing model from: {model_save_path}")
-        model.load_state_dict(torch.load(model_save_path))
-        print("Model loaded. Resuming training...")
+    # === Load datasets
 
-    test_acc_ref = 0
-    for epoch in range(n_epoch):
-        ramdom_dataset_file(dataset_path)
+    # test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
+    # test_loader = DataLoader(test_dataset, batch_size=None)
+
+    # if train:
+    #     train_dataset = ToothMeshDataset(dataset_path, train=True, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
+    #     print("Train dataset size: ", len(train_dataset))
+    #     train_loader = DataLoader(train_dataset, batch_size=None, shuffle=True)
+
+    # === Create the model
+
+    C_in = {'xyz': 3, 'hks': 16}[input_features]
+
+    model = diffusion_net.layers.DiffusionNet(C_in=C_in,
+                                            C_out=n_class,
+                                            C_width=c_width,
+                                            N_block=n_block,
+                                            last_activation=lambda x: torch.nn.functional.log_softmax(x, dim=-1),
+                                            outputs_at='vertices',
+                                            dropout=True)
+
+    model = model.to(device)
+
+    if not train:
+        print("Loading pretrained model from: " + str(pretrain_path))
+        model.load_state_dict(torch.load(pretrain_path))
+
+    # === Optimize
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+  
+    if train:
+        print("Training...")
+
+        # 检查是否存在之前保存的模型
+        if os.path.exists(model_save_path):
+            print(f"Loading existing model from: {model_save_path}")
+            model.load_state_dict(torch.load(model_save_path))
+            print("Model loaded. Resuming training...")
+
+        test_acc_ref = 0
+        for epoch in range(n_epoch):
+            ramdom_dataset_file(dataset_path)
+            test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
+            test_loader = DataLoader(test_dataset, batch_size=None)
+            print("Test dataset size: ", len(test_loader))
+            train_dataset = ToothMeshDataset(dataset_path, train=True, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
+            train_loader = DataLoader(train_dataset, batch_size=None, shuffle=True)
+            print("Train dataset size: ", len(train_dataset))
+            
+            train_acc = train_epoch(epoch)
+            test_acc = test()
+            print("Epoch {} - Train overall: {:06.3f}%  Test overall: {:06.2f}%".format(epoch, 100*train_acc, 100*test_acc))
+            if test_acc > test_acc_ref:
+                test_acc_ref = test_acc
+                model_tmp_save_path = os.path.join(base_path, \
+                    "data/saved_models/tooth_mesh_seg_{}_6x128_best_epoch{}_acc{:06.3f}.pth".format(input_features,epoch,100*test_acc))
+                print(" ==> saving best model to " + model_tmp_save_path)
+                torch.save(model.state_dict(), model_tmp_save_path)
+
+        print(" ==> saving last model to " + model_save_path)
+        torch.save(model.state_dict(), model_save_path)
+    # Test
+    else:
+        test_old_file = os.path.join(dataset_path, "test-bak.txt")
+        test_new_file = os.path.join(dataset_path, "test.txt")
+        os.system("cp " + test_old_file + " " + test_new_file)
         test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
         test_loader = DataLoader(test_dataset, batch_size=None)
-        print("Test dataset size: ", len(test_loader))
-        train_dataset = ToothMeshDataset(dataset_path, train=True, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
-        train_loader = DataLoader(train_dataset, batch_size=None, shuffle=True)
-        print("Train dataset size: ", len(train_dataset))
-        
-        train_acc = train_epoch(epoch)
+
         test_acc = test()
-        print("Epoch {} - Train overall: {:06.3f}%  Test overall: {:06.3f}%".format(epoch, 100*train_acc, 100*test_acc))
-        if test_acc > test_acc_ref:
-            test_acc_ref = test_acc
-            model_tmp_save_path = os.path.join(base_path, \
-                "data/saved_models/tooth_mesh_seg_{}_6x128_best_epoch{}_acc{:06.3f}.pth".format(input_features,epoch,100*test_acc))
-            print(" ==> saving best model to " + model_tmp_save_path)
-            torch.save(model.state_dict(), model_tmp_save_path)
-
-    print(" ==> saving last model to " + model_save_path)
-    torch.save(model.state_dict(), model_save_path)
-# Test
-else:
-    test_old_file = os.path.join(dataset_path, "test-bak.txt")
-    test_new_file = os.path.join(dataset_path, "test.txt")
-    # os.system("cp " + test_old_file + " " + test_new_file)
-    test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
-    test_loader = DataLoader(test_dataset, batch_size=None)
-
-    test_acc = test()
-    print("Overall test accuracy: {:06.3f}%".format(100*test_acc))
-
+        print("Overall test accuracy: {:06.3f}%".format(100*test_acc))
