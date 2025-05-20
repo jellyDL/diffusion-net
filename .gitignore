@@ -56,3 +56,5 @@ pyrightconfig.json
 
 op_cache
 test_out
+*.log
+*.pth

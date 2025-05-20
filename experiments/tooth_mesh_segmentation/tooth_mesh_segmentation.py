@@ -8,6 +8,8 @@ import numpy as np
 import open3d as o3d
 import matplotlib.pyplot as plt
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../src/"))  # add the path to the DiffusionNet src
 import diffusion_net
 from tooth_mesh_dataset import ToothMeshDataset
@@ -67,18 +69,18 @@ k_eig = 128
 
 # Training settings
 train = not args.evaluate
-n_epoch = 300
+n_epoch = 500
 lr = 1e-3
 decay_every = 10
-decay_rate = 0.5
+decay_rate = 0.8
 augment_random_rotate = (input_features == 'xyz')
 
 # Paths
 base_path = os.path.dirname(__file__)
 op_cache_dir = os.path.join(base_path, "data", "op_cache")
-pretrain_path = os.path.join(base_path, "data/saved_models/tooth_mesh_seg_{}_4x128.pth".format(input_features))
-model_save_path = os.path.join(base_path, "data/saved_models/tooth_mesh_seg_{}_4x128.pth".format(input_features))
-dataset_path = os.path.join(base_path, "/home/jelly/Datasets/Teeth3DS+_dataset")
+pretrain_path = os.path.join(base_path, "data/saved_models/tooth_mesh_seg_{}_6x128.pth".format(input_features))
+model_save_path = os.path.join(base_path, "data/saved_models/tooth_mesh_seg_{}_6x128.pth".format(input_features))
+dataset_path = os.path.join(base_path, "/home/wangjialei/Datasets/Teeth3DS+_dataset")
 
 # === Load datasets
 
@@ -97,7 +99,8 @@ C_in = {'xyz': 3, 'hks': 16}[input_features]
 model = diffusion_net.layers.DiffusionNet(C_in=C_in,
                                           C_out=n_class,
                                           C_width=128,
-                                          N_block=4,
+                                          # N_block=4,
+                                          N_block=6,
                                           last_activation=lambda x: torch.nn.functional.log_softmax(x, dim=-1),
                                           outputs_at='vertices',
                                           dropout=True)
@@ -174,7 +177,7 @@ def train_epoch(epoch):
     return train_acc
 
 
-# Do an evaluation pass on the test dataset 
+# Do an evaluation pass on the test dataset
 def test():
     
     model.eval()
@@ -242,6 +245,18 @@ def test():
     return test_acc 
 
 
+# if train:
+#     print("Training...")
+
+#     for epoch in range(n_epoch):
+#         train_acc = train_epoch(epoch)
+#         test_acc = test()
+#         print("Epoch {} - Train overall: {:06.3f}%  Test overall: {:06.3f}%".format(epoch, 100*train_acc, 100*test_acc))
+
+#     print(" ==> saving last model to " + model_save_path)
+#     torch.save(model.state_dict(), model_save_path)
+
+
 def ramdom_dataset_file(dataset_path, train_num=30, test_num=10):
     train_txt_file = os.path.join(dataset_path, "train-bak.txt")
     test_txt_file = os.path.join(dataset_path, "test-bak.txt")
@@ -266,14 +281,13 @@ def ramdom_dataset_file(dataset_path, train_num=30, test_num=10):
 if train:
     print("Training...")
 
-    test_acc_ref = 0
-
     # 检查是否存在之前保存的模型
     if os.path.exists(model_save_path):
         print(f"Loading existing model from: {model_save_path}")
         model.load_state_dict(torch.load(model_save_path))
         print("Model loaded. Resuming training...")
 
+    test_acc_ref = 0
     for epoch in range(n_epoch):
         ramdom_dataset_file(dataset_path)
         test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
@@ -289,16 +303,20 @@ if train:
         if test_acc > test_acc_ref:
             test_acc_ref = test_acc
             model_tmp_save_path = os.path.join(base_path, \
-                "data/saved_models/tooth_mesh_seg_{}_4x128_best.pth".format(input_features))
+                "data/saved_models/tooth_mesh_seg_{}_6x128_best_epoch{}_acc{:06.3f}.pth".format(input_features,epoch,100*test_acc))
             print(" ==> saving best model to " + model_tmp_save_path)
             torch.save(model.state_dict(), model_tmp_save_path)
 
     print(" ==> saving last model to " + model_save_path)
     torch.save(model.state_dict(), model_save_path)
-    # Test
-    else:
-        test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
-        test_loader = DataLoader(test_dataset, batch_size=None)
-       
-        test_acc = test()
-        print("Overall test accuracy: {:06.3f}%".format(100*test_acc))
+# Test
+else:
+    test_old_file = os.path.join(dataset_path, "test-bak.txt")
+    test_new_file = os.path.join(dataset_path, "test.txt")
+    # os.system("cp " + test_old_file + " " + test_new_file)
+    test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
+    test_loader = DataLoader(test_dataset, batch_size=None)
+
+    test_acc = test()
+    print("Overall test accuracy: {:06.3f}%".format(100*test_acc))
+

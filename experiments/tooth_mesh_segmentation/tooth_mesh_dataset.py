@@ -25,7 +25,7 @@ class ToothMeshDataset(Dataset):
         with open(os.path.join(self.root_dir, split_file)) as f:
             files = [line.strip() for line in f]
 
-        batch_iter_flag = True
+        batch_iter_flag = False
         if batch_iter_flag:
             for f in files:
                 mesh_file = os.path.join(self.root_dir, "meshes", f)
