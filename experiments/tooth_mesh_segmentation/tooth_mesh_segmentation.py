@@ -304,7 +304,7 @@ if __name__ == "__main__":
 
         test_acc_ref = 0
         for epoch in range(n_epoch):
-            ramdom_dataset_file(dataset_path, train_num, test_num)
+            ramdom_dataset_file(dataset_path, train_num=train_num, test_num=test_num)
             test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
             test_loader = DataLoader(test_dataset, batch_size=None)
             print("Test dataset size: ", len(test_loader))
