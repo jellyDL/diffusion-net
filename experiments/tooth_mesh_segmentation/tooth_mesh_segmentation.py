@@ -222,8 +222,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--evaluate", action="store_true", help="evaluate using the pretrained model")
     parser.add_argument("--input_features", type=str, help="what features to use as input ('xyz' or 'hks') default: hks", default='xyz')
-    parser.add_argument("--C_width", type=int, default=128)
-    parser.add_argument("--N_block", type=int, default=4)
+    parser.add_argument("--c_width", type=int, default=128)
+    parser.add_argument("--n_block", type=int, default=4)
+    parser.add_argument("--train_num", type=int, default=30)
+    parser.add_argument("--test_num", type=int, default=10)
     args = parser.parse_args()
 
     # System settings
@@ -242,8 +244,10 @@ if __name__ == "__main__":
     decay_every = 10
     decay_rate = 0.8
     augment_random_rotate = (input_features == 'xyz')
-    c_width = args.C_width
-    n_block = args.N_block
+    c_width = args.c_width
+    n_block = args.n_block
+    train_num = args.train_num
+    test_num = args.test_num
 
     # Paths
     base_path = os.path.dirname(__file__)
@@ -300,7 +304,7 @@ if __name__ == "__main__":
 
         test_acc_ref = 0
         for epoch in range(n_epoch):
-            ramdom_dataset_file(dataset_path)
+            ramdom_dataset_file(dataset_path, train_num, test_num)
             test_dataset = ToothMeshDataset(dataset_path, train=False, k_eig=k_eig, use_cache=True, op_cache_dir=op_cache_dir)
             test_loader = DataLoader(test_dataset, batch_size=None)
             print("Test dataset size: ", len(test_loader))
