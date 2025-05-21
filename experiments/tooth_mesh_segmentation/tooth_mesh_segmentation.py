@@ -318,7 +318,7 @@ if __name__ == "__main__":
             if test_acc > test_acc_ref:
                 test_acc_ref = test_acc
                 model_tmp_save_path = os.path.join(base_path, \
-                    "data/saved_models/tooth_mesh_seg_{}_6x128_best_epoch{}_acc{:06.3f}.pth".format(input_features,epoch,100*test_acc))
+                    "data/saved_models/tooth_mesh_seg_{}_{}x{}_best_epoch{}_acc{:06.3f}.pth".format(input_features, n_block, c_width, epoch, 100*test_acc))
                 print(" ==> saving best model to " + model_tmp_save_path)
                 torch.save(model.state_dict(), model_tmp_save_path)
 
