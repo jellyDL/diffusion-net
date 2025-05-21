@@ -233,7 +233,7 @@ if __name__ == "__main__":
     dtype = torch.float32
 
     # Problem settings
-    n_class = 64  # 牙齿分割有10个类别
+    n_class = 50  # 牙齿分割有10个类别
     input_features = args.input_features
     k_eig = 128
 
