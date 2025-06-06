@@ -1,11 +1,13 @@
 import os
+import sys
+import time
 import numpy as np
 import open3d as o3d
 import scipy.sparse as sparse
 import scipy.sparse.linalg as slinalg
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
-import scipy.sparse.linalg._eigen.arpack
+from scipy.sparse.linalg._eigen.arpack import ArpackNoConvergence
 
 
 def load_mesh(obj_path, simplify=True, target_ratio=0.2):
@@ -104,10 +106,15 @@ def compute_hks(L, num_eigenvalues=100, time_steps=None):
         try:
             print(f"尝试计算 {num_eigenvalues} 个特征值...")
             # 增加最大迭代次数并设置更高的收敛容差
-            eigenvalues, eigenvectors = slinalg.eigsh(L, k=num_eigenvalues, which='SM', 
-                                                     maxiter=300000, tol=1e-5)
+            start_time = time.time()
+            eigenvalues, eigenvectors = slinalg.eigsh(
+                L, k=num_eigenvalues, which='SM',
+                maxiter=30000, tol=1e-3
+            )
+            elapsed = time.time() - start_time
+            print(f"特征分解耗时: {elapsed:.2f} 秒")
             break
-        except arpack.ArpackNoConvergence as e:
+        except ArpackNoConvergence as e:
             # 使用已收敛的部分特征值和特征向量
             print(f"部分收敛: {len(e.eigenvalues)}/{num_eigenvalues} 个特征值已收敛")
             if len(e.eigenvalues) >= 10:
@@ -140,211 +147,6 @@ def compute_hks(L, num_eigenvalues=100, time_steps=None):
         hks_features[:, i] = hks
     
     return hks_features
-
-
-def visualize_hks(mesh, hks_features, time_idx=0, output_dir=None, colormap_name='jet'):
-    """可视化HKS特征，使用增强对比度的方式"""
-    # 归一化HKS特征到[0,1]区间
-    hks = hks_features[:, time_idx]
-    
-    # 使用更强的对比度增强 - 对牙齿模型使用更窄的百分位范围
-    p_low, p_high = np.percentile(hks, [5, 95])  # 调整为5-95百分位，增强中间值的差异
-    hks_clipped = np.clip(hks, p_low, p_high)
-    hks_normalized = (hks_clipped - p_low) / (p_high - p_low)
-    
-    # 应用非线性映射增强对比度
-    hks_enhanced = np.power(hks_normalized, 0.7)  # gamma校正，增强中等强度的对比
-    
-    # 使用对比度更鲜明的颜色映射
-    colormap = get_cmap(colormap_name)
-    colors = colormap(hks_enhanced)[:, :3]
-    
-    # 设置网格顶点颜色
-    colored_mesh = o3d.geometry.TriangleMesh()
-    colored_mesh.vertices = mesh.vertices
-    colored_mesh.triangles = mesh.triangles
-    colored_mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
-    
-    # 可视化
-    o3d.visualization.draw_geometries([colored_mesh])
-    
-    # 保存结果
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-        output_path = os.path.join(output_dir, f"hks_t{time_idx}.ply")
-        o3d.io.write_triangle_mesh(output_path, colored_mesh)
-        print(f"Saved visualization to {output_path}")
-    
-    return colored_mesh
-
-
-# 添加新函数，显示不同时间尺度之间的差异
-def visualize_hks_differences(mesh, hks_features, time_steps, output_dir=None):
-    """可视化不同时间尺度间的HKS差异"""
-    
-    # 选择几组有代表性的比较（例如最小vs中等，中等vs最大）
-    comparisons = [
-        (0, len(time_steps) // 2),  # 最小时间尺度 vs 中间时间尺度
-        (len(time_steps) // 2, len(time_steps) - 1),  # 中间时间尺度 vs 最大时间尺度
-        (0, len(time_steps) - 1)  # 最小时间尺度 vs 最大时间尺度
-    ]
-    
-    for i, j in comparisons:
-        hks_diff = np.abs(hks_features[:, i] - hks_features[:, j])
-        
-        # 归一化差异
-        p_low, p_high = np.percentile(hks_diff, [2, 98])
-        hks_diff_normalized = np.clip((hks_diff - p_low) / (p_high - p_low), 0, 1)
-        
-        # 使用"hot"颜色映射突显差异区域
-        colormap = get_cmap('hot')
-        colors = colormap(hks_diff_normalized)[:, :3]
-        
-        # 设置网格顶点颜色
-        colored_mesh = o3d.geometry.TriangleMesh()
-        colored_mesh.vertices = mesh.vertices
-        colored_mesh.triangles = mesh.triangles
-        colored_mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
-        
-        # 可视化
-        print(f"Visualizing difference between t={time_steps[i]} and t={time_steps[j]}")
-        o3d.visualization.draw_geometries([colored_mesh])
-        
-        # 保存结果
-        if output_dir:
-            diff_path = os.path.join(output_dir, f"hks_diff_t{i}_t{j}.ply")
-            o3d.io.write_triangle_mesh(diff_path, colored_mesh)
-            print(f"Saved difference visualization to {diff_path}")
-
-
-def visualize_tooth_features(mesh, hks_features, time_steps, output_dir=None):
-    """专门为牙齿模型优化的HKS可视化函数，突显从局部到全局的特征变化"""
-    
-    # 为局部细节使用更小的时间尺度
-    local_idx = 0  # 最小时间尺度
-    hks = hks_features[:, local_idx]
-    p_low, p_high = np.percentile(hks, [1, 99])
-    hks_normalized = np.clip((hks - p_low) / (p_high - p_low), 0, 1)
-    # 增强对比度，突显局部细节
-    hks_enhanced = np.power(hks_normalized, 0.5)
-    
-    # 设置顶点颜色
-    local_mesh = o3d.geometry.TriangleMesh()
-    local_mesh.vertices = mesh.vertices
-    local_mesh.triangles = mesh.triangles
-    colormap = get_cmap('jet')
-    local_mesh.vertex_colors = o3d.utility.Vector3dVector(colormap(hks_enhanced)[:, :3])
-    
-    # 创建可视化窗口并设置为白色背景(局部特征)
-    vis = o3d.visualization.Visualizer()
-    vis.create_window(window_name="牙齿HKS特征：局部细节", width=1280, height=720)
-    vis.add_geometry(local_mesh)
-    
-    # 设置渲染选项 - 白色背景
-    render_option = vis.get_render_option()
-    render_option.background_color = np.array([1.0, 1.0, 1.0])  # 白色背景
-    render_option.light_on = True
-    
-    # 自适应窗口视图
-    vis.get_view_control().set_zoom(0.8)
-    
-    # 保存并显示
-    if output_dir:
-        local_path = os.path.join(output_dir, "tooth_local_features.ply")
-        o3d.io.write_triangle_mesh(local_path, local_mesh)
-        
-    vis.run()
-    vis.destroy_window()
-    
-    # 为全局结构使用更大的时间尺度
-    global_idx = len(time_steps) - 1  # 最大时间尺度
-    hks = hks_features[:, global_idx]
-    p_low, p_high = np.percentile(hks, [5, 95])
-    hks_normalized = np.clip((hks - p_low) / (p_high - p_low), 0, 1)
-    
-    # 设置顶点颜色
-    global_mesh = o3d.geometry.TriangleMesh()
-    global_mesh.vertices = mesh.vertices
-    global_mesh.triangles = mesh.triangles
-    colormap = get_cmap('plasma')
-    global_mesh.vertex_colors = o3d.utility.Vector3dVector(colormap(hks_normalized)[:, :3])
-    
-    # 创建可视化窗口并设置为白色背景(全局特征)
-    vis = o3d.visualization.Visualizer()
-    vis.create_window(window_name="牙齿HKS特征：全局结构", width=1280, height=720)
-    vis.add_geometry(global_mesh)
-    
-    # 设置渲染选项 - 白色背景
-    render_option = vis.get_render_option()
-    render_option.background_color = np.array([1.0, 1.0, 1.0])  # 白色背景
-    render_option.light_on = True
-    
-    # 自适应窗口视图
-    vis.get_view_control().set_zoom(0.8)
-    
-    # 保存并显示
-    if output_dir:
-        global_path = os.path.join(output_dir, "tooth_global_features.ply")
-        o3d.io.write_triangle_mesh(global_path, global_mesh)
-    
-    vis.run()
-    vis.destroy_window()
-    
-    return local_mesh, global_mesh
-
-
-def visualize_hks_consistent(mesh, hks_features, time_steps, output_dir=None):
-    """使用全局一致的归一化方法可视化不同时间尺度的HKS特征，使结果更易于比较"""
-    
-    # 首先找出所有时间尺度下HKS值的全局最小值和最大值
-    all_hks = hks_features.flatten()
-    # 使用较为温和的百分位裁剪，避免极端值影响
-    global_min, global_max = np.percentile(all_hks, [10, 90])
-    
-    # 使用一致的颜色映射
-    colormap_name = 'viridis'
-    colormap = get_cmap(colormap_name)
-    
-    # 依次可视化每个时间尺度
-    for t_idx, t in enumerate(time_steps):
-        print(f"Consistently visualizing time step t={t}")
-        hks = hks_features[:, t_idx]
-        
-        # 使用全局统一的归一化
-        hks_normalized = np.clip((hks - global_min) / (global_max - global_min), 0, 1)
-        
-        # 轻微的非线性调整，以平衡不同尺度的视觉效果
-        gamma = 0.9  # 更接近线性映射
-        hks_enhanced = np.power(hks_normalized, gamma)
-        
-        # 设置网格顶点颜色
-        colored_mesh = o3d.geometry.TriangleMesh()
-        colored_mesh.vertices = mesh.vertices
-        colored_mesh.triangles = mesh.triangles
-        colored_mesh.vertex_colors = o3d.utility.Vector3dVector(colormap(hks_enhanced)[:, :3])
-        
-        # 可视化
-        o3d.visualization.draw_geometries([colored_mesh])
-        
-        # 保存结果
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
-            output_path = os.path.join(output_dir, f"hks_consistent_t{t_idx}.ply")
-            o3d.io.write_triangle_mesh(output_path, colored_mesh)
-            print(f"Saved consistent visualization to {output_path}")
-    
-    # 返回不同时间尺度下的最小和最大值，以便查看数值范围差异
-    time_step_stats = []
-    for t_idx in range(len(time_steps)):
-        hks = hks_features[:, t_idx]
-        p_min, p_max = np.percentile(hks, [10, 90])
-        time_step_stats.append((p_min, p_max))
-    
-    print("\nHKS值范围统计（10-90百分位）:")
-    for t_idx, (min_val, max_val) in enumerate(time_step_stats):
-        print(f"  t={time_steps[t_idx]}: {min_val:.6f} - {max_val:.6f}, 范围: {max_val-min_val:.6f}")
-    
-    return time_step_stats
 
 
 def explain_hks_heatmap(time_steps):
@@ -389,43 +191,6 @@ def explain_hks_heatmap(time_steps):
     print("   - 牙齿分类与识别：不同类型牙齿(门牙、犬齿、磨牙)有不同HKS特征")
     print("   - 结构分析：可用于评估牙齿解剖特征")
     print("   - 对比分析：可比较不同牙齿模型或同一牙齿的不同扫描结果")
-    print("================================================\n")
-
-
-def explain_hks_color_meaning():
-    """详细解释HKS热力图中不同颜色深浅的具体含义"""
-    print("\n========== HKS热力图颜色含义详解 ==========")
-    print("在HKS热力图中，颜色代表了热在曲面上扩散的行为特征:")
-    
-    print("\n1. 颜色映射基本含义:")
-    print("   • 红/黄色区域 (高值): 热量保留较长时间的区域")
-    print("   • 蓝/青色区域 (低值): 热量扩散较快的区域")
-    
-    print("\n2. 几何特征与颜色的关系:")
-    print("   • 尖锐凸起: 通常呈现为红/黄色热点，因为热量从尖端扩散较慢")
-    print("   • 平坦区域: 通常呈现为青色或浅色区域，热量均匀扩散")
-    print("   • 凹陷区域: 通常呈现为深蓝色，热量容易聚集并快速扩散")
-    print("   • 边缘和轮廓: 在中等时间尺度下呈现为较明显的颜色对比")
-    
-    print("\n3. 牙齿模型特有颜色模式:")
-    print("   • 咬合面纹理: 小尺度下显示为红黄色细小图案，代表微小凸起和沟壑")
-    print("   • 牙冠边缘: 中等尺度下呈现为明显的颜色边界")
-    print("   • 牙根区域: 大尺度下通常颜色较为均匀，与牙冠形成对比")
-    print("   • 尖牙尖端: 在所有尺度下通常保持较高值(红/黄色)")
-    
-    print("\n4. 不同时间尺度下的颜色变化:")
-    print("   • 小时间尺度 (t≤0.1): 颜色变化剧烈，微小几何细节都能引起颜色差异")
-    print("   • 中等时间尺度 (0.1<t≤10): 主要结构特征形成稳定的颜色模式")
-    print("   • 大时间尺度 (t>10): 颜色变化平缓，只有主要结构差异才能看到颜色差别")
-    
-    print("\n5. 颜色变化率的意义:")
-    print("   • 颜色急剧变化区域: 表示几何结构突变处，如边缘或拐角")
-    print("   • 颜色渐变区域: 表示几何特征平滑过渡")
-    print("   • 颜色一致区域: 表示几何特征相似的连续区域")
-    
-    print("\n6. 特征差异图特有颜色含义:")
-    print("   • 亮红/黄色区域: 局部特征与全局特征差异最大的区域")
-    print("   • 暗色/蓝色区域: 在不同时间尺度下表现相似的区域")
     print("================================================\n")
 
 
@@ -504,8 +269,6 @@ def main(obj_path, output_dir=None, simplify=True, target_ratio=0.2):
         
         # 解释HKS热力图含义
         explain_hks_heatmap(time_steps)
-        # 解释热力图中颜色的具体含义
-        explain_hks_color_meaning()
         
         # 可视化不同时间尺度的HKS
         print("Visualizing HKS features with enhanced contrast...")
@@ -563,7 +326,7 @@ def main(obj_path, output_dir=None, simplify=True, target_ratio=0.2):
             view_control.set_zoom(0.8)
             
             # 运行可视化
-            vis.run()
+            # vis.run()
             vis.destroy_window()
             
             # 保存结果
@@ -589,85 +352,6 @@ def main(obj_path, output_dir=None, simplify=True, target_ratio=0.2):
         print("- 暗色区域: 在不同时间尺度下保持相似特性的区域")
         print("- 这种可视化有助于理解哪些区域的几何特征是尺度相关的，哪些是尺度不变的")
         
-        # 创建特征差异可视化
-        def visualize_feature_differences(mesh, hks_features, time_steps, output_dir=None):
-            """可视化不同时间尺度HKS特征的相对差异"""
-            # 选择最小和最大时间尺度计算相对变化
-            min_idx, max_idx = 0, len(time_steps) - 1
-            
-            # 计算归一化的相对变化率
-            min_hks = hks_features[:, min_idx]
-            max_hks = hks_features[:, max_idx]
-            
-            # 避免除零错误
-            epsilon = np.mean(min_hks) * 0.001
-            relative_change = np.abs(max_hks - min_hks) / (min_hks + epsilon)
-            
-            # 归一化并裁剪极端值
-            p_low, p_high = np.percentile(relative_change, [5, 95])
-            relative_change_norm = np.clip((relative_change - p_low) / (p_high - p_low), 0, 1)
-            
-            # 使用热图颜色映射显示变化大的区域
-            colormap = get_cmap('hot')
-            colors = colormap(relative_change_norm)[:, :3]
-            
-            # 设置网格顶点颜色
-            colored_mesh = o3d.geometry.TriangleMesh()
-            colored_mesh.vertices = mesh.vertices
-            colored_mesh.triangles = mesh.triangles
-            colored_mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
-            
-            # 创建可视化窗口并设置为白色背景
-            vis = o3d.visualization.Visualizer()
-            vis.create_window(window_name=f"从局部到全局的特征变化(t={time_steps[min_idx]}→t={time_steps[max_idx]})", width=1280, height=720)
-            vis.add_geometry(colored_mesh)
-            
-            # 设置渲染选项 - 白色背景
-            render_option = vis.get_render_option()
-            render_option.background_color = np.array([1.0, 1.0, 1.0])  # 白色背景
-            render_option.light_on = True
-            
-            # 自适应窗口视图
-            view_control = vis.get_view_control()
-            view_control.set_zoom(0.8)
-            
-            # 运行可视化
-            vis.run()
-            vis.destroy_window()
-            
-            # 保存结果
-            if output_dir:
-                output_path = os.path.join(output_dir, "hks_feature_change.ply")
-                o3d.io.write_triangle_mesh(output_path, colored_mesh)
-                print(f"Saved feature difference visualization to {output_path}")
-            
-            return colored_mesh
-        
-        # 执行特征差异可视化
-        visualize_feature_differences(mesh, hks_features, time_steps, output_dir)
-        
-        # 如果需要查看不同颜色映射的效果，可以取消以下注释
-        '''
-        # 高级可视化：使用不同颜色映射可以提供额外的视觉角度
-        print("\n可选：使用多种颜色映射进行可视化...")
-        colormap_names = ['viridis', 'plasma', 'inferno', 'magma', 'cividis']
-        for colormap_name in colormap_names:
-            print(f"\n使用 {colormap_name} 颜色映射进行全局特征可视化...")
-            visualize_hks(mesh, hks_features, -1, output_dir, colormap_name=colormap_name)
-        '''
-        
-        # 显示不同时间尺度间的差异
-        print("Visualizing differences between time scales...")
-        # visualize_hks_differences(mesh, hks_features, time_steps, output_dir)
-        
-        # 专门为牙齿模型优化的可视化
-        print("Visualizing tooth-specific features...")
-        visualize_tooth_features(mesh, hks_features, time_steps, output_dir)
-        
-        # 添加一致化的可视化，使不同时间尺度可比较
-        print("\n使用全局一致的归一化方法可视化HKS特征...")
-        # visualize_hks_consistent(mesh, hks_features, time_steps, output_dir)
-        
         return hks_features
     except Exception as e:
         print(f"计算HKS特征时出错: {e}")
@@ -676,7 +360,6 @@ def main(obj_path, output_dir=None, simplify=True, target_ratio=0.2):
 
 
 if __name__ == "__main__":
-    import sys
     
     if len(sys.argv) < 2:
         print("Usage: python visualize_hks.py <obj_file_path> [output_directory] [simplify_ratio]")
