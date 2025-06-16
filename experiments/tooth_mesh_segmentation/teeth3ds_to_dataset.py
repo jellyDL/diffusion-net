@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 
 def traverse_teeth3ds(directory):
@@ -42,7 +43,8 @@ def traverse_teeth3ds(directory):
                      
 if __name__ == "__main__":
     # Teeth3DS+ 文件夹路径
-    teeth3ds_dir = "/home/jelly/Datasets/Teeth3DS+"
+    # teeth3ds_dir = "/home/jelly/Datasets/Teeth3DS+"
+    teeth3ds_dir = sys.argv[1] if len(sys.argv) > 1 else "/Users/jelly/Desktop/Teeth3DS"
         
     traverse_teeth3ds(teeth3ds_dir)
 
