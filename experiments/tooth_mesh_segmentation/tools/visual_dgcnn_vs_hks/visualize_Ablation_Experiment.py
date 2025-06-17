@@ -179,7 +179,7 @@ def run_capture_mode(ply_path, camera_json_path):
 
 def main():
     if len(sys.argv) < 2:
-        print("python visualize_ply_with_custom_camera.py <mode> <ply_path> [camera_json_path]")
+        print("python visualize_Ablation_Experiment.py <mode> <ply_path> [camera_json_path]")
         print("e. python visualize_Ablation_Experiment.py v Ablation_Experiment1/X2J0T3NG_upper_colored_BK.ply ")
         print("e. python visualize_Ablation_Experiment.py c Ablation_Experiment1 ")
         print("e. python visualize_Ablation_Experiment.py c Ablation_Experiment1 camera_view.json")
