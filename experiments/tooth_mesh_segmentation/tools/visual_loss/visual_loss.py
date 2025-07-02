@@ -145,7 +145,7 @@ for i in range(len(epochs)):
     training_curves['Final Loss']['B_IoU'].append(min(95, max(25, all_biou)))
 
 # 创建图形
-plt.figure(figsize=(15, 8.5))
+plt.figure(figsize=(15, 6.0))
 
 # 绘制总loss曲线
 plt.subplot(1, 3, 1)
