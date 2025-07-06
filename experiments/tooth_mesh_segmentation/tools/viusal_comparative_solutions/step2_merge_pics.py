@@ -1,0 +1,147 @@
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+
+def merge_images_grid(image_path, image_names, label_list, label_height, font_size, output_path, spacing=5, cols=3):
+    """
+    将多张图片按网格排布并保存为一张整图。
+
+    :param image_path: 图片文件夹路径
+    :param image_names: 图片文件名列表
+    :param output_path: 输出文件路径
+    :param spacing: 图片之间的间距，单位为像素
+    :param cols: 每行图片数量
+    """
+    images = []
+    
+    for i, file_name in enumerate(image_names):
+        image_file = os.path.join(image_path, file_name)
+        img = plt.imread(image_file)
+        # 处理不同通道数的图片
+        if img.ndim == 3 and img.shape[2] == 4:  # RGBA
+            img = img[:, :, :3]  # 只取RGB通道
+        elif img.ndim == 2:  # 灰度图
+            img = np.stack([img] * 3, axis=2)  # 转换为RGB
+        
+        # 创建带有标签区域的新图像
+        new_height = img.shape[0] + label_height
+        new_width = img.shape[1]
+        
+        # 创建新的图像数组，上方为标签区域，下方为原图
+        if img.dtype == np.float32 or img.dtype == np.float64:
+            new_img = np.ones((new_height, new_width, 3), dtype=img.dtype)  # 白色背景
+            new_img[label_height:, :] = img  # 将原图放在下方
+            img_pil = Image.fromarray((new_img * 255).astype(np.uint8))
+        else:
+            new_img = np.ones((new_height, new_width, 3), dtype=np.uint8) * 255  # 白色背景
+            new_img[label_height:, :] = img  # 将原图放在下方
+            img_pil = Image.fromarray(new_img)
+        
+        # 添加标签到上方区域
+        draw = ImageDraw.Draw(img_pil)
+        # label = f"({chr(97 + i)})"  # (a), (b), (c), ...
+        label = label_list[i] 
+        
+        # 尝试使用系统字体，字体更大
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", font_size)
+        except:
+            try:
+                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
+            except:
+                font = ImageFont.load_default()
+        
+        # 获取文本尺寸
+        bbox = draw.textbbox((0, 0), label, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        
+        # 在标签区域居中添加文字
+        x = (new_width - text_width) // 2
+        y = (label_height - text_height) // 2
+        
+        draw.text((x, y), label, fill='black', font=font)
+        
+        # 转换回numpy数组
+        img_with_label = np.array(img_pil)
+        images.append(img_with_label)
+    
+    # 计算网格尺寸
+    rows = (len(images) + cols - 1) // cols  # 向上取整
+    
+    # 确保所有图片尺寸一致
+    max_img_height = max(img.shape[0] for img in images)
+    max_img_width = max(img.shape[1] for img in images)
+    
+    # 计算总的画布尺寸
+    total_width = cols * max_img_width + (cols - 1) * spacing
+    total_height = rows * max_img_height + (rows - 1) * spacing
+    
+    # 创建最终的合并图像
+    if images[0].dtype == np.float64 or images[0].dtype == np.float32:
+        merged_image = np.ones((total_height, total_width, 3), dtype=np.float32)
+    else:
+        merged_image = np.ones((total_height, total_width, 3), dtype=np.uint8) * 255
+    
+    # 将每张图片放置到网格中
+    for i, img in enumerate(images):
+        row = i // cols
+        col = i % cols
+        
+        # 计算位置
+        y_start = row * (max_img_height + spacing)
+        x_start = col * (max_img_width + spacing)
+        
+        # 放置图片
+        h, w = img.shape[:2]
+        merged_image[y_start:y_start + h, x_start:x_start + w] = img
+    
+    # 保存合并后的图像
+    # 将numpy数组转换为PIL图像以调整饱和度
+    if merged_image.dtype == np.float32 or merged_image.dtype == np.float64:
+        pil_image = Image.fromarray((merged_image * 255).astype(np.uint8))
+    else:
+        pil_image = Image.fromarray(merged_image)
+    
+    # 降低饱和度
+    enhancer = ImageEnhance.Color(pil_image)
+    pil_image = enhancer.enhance(0.5)  # 0.7表示保留70%的饱和度
+    
+    # 保存图像
+    pil_image.save(output_path)
+
+if __name__ == "__main__":
+    
+    image_path = "render_pics"
+    
+    # 获取当前目录下所有以render_开头的png文件
+    image_names = [f for f in os.listdir(image_path) if f.startswith('render_') and f.endswith('.png')]
+
+    image_names_sorted = []
+    image_names_sorted.append(image_names[5])
+    image_names_sorted.append(image_names[4])
+    image_names_sorted.append(image_names[0])
+    image_names_sorted.append(image_names[1])
+    image_names_sorted.append(image_names[3])
+    image_names_sorted.append(image_names[2])
+    image_names_sorted.append(image_names[6])
+    
+    label_list =[]
+    label_list.append("Raw Mesh")
+    label_list.append("DGCNN")
+    label_list.append("PointNext")
+    label_list.append("Geo-Net")
+    label_list.append("CrossTooth")
+    label_list.append("Ours")
+    label_list.append("Ground Truth")
+
+    output_file = "merged_rendered_images.png"
+    spacing = 80 # 图片之间的间距，单位为像素
+    label_height = 160  # 标签区域的高度
+    font_size = 80  # 标签字体大小
+    
+    merge_images_grid(image_path, image_names_sorted, 
+                      label_list, label_height, font_size,
+                      output_file, spacing, cols=len(image_names_sorted))
+    print(f"已合并 {len(image_names)} 张图片为2行3列网格，间距为 {spacing} 像素，输出文件: {output_file}")
