@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
-def merge_images_grid(image_path, image_names, label_list, label_height, font_size, output_path, spacing=5, cols=3):
+def merge_images_grid(image_files, label_list, label_height, font_size, output_path, spacing=5, cols=3):
     """
     将多张图片按网格排布并保存为一张整图。
 
@@ -15,8 +15,8 @@ def merge_images_grid(image_path, image_names, label_list, label_height, font_si
     """
     images = []
     
-    for i, file_name in enumerate(image_names):
-        image_file = os.path.join(image_path, file_name)
+    for i, image_file in enumerate(image_files):
+        print("### image_file", image_file)
         img = plt.imread(image_file)
         # 处理不同通道数的图片
         if img.ndim == 3 and img.shape[2] == 4:  # RGBA
@@ -41,7 +41,7 @@ def merge_images_grid(image_path, image_names, label_list, label_height, font_si
         # 添加标签到上方区域
         draw = ImageDraw.Draw(img_pil)
         # label = f"({chr(97 + i)})"  # (a), (b), (c), ...
-        label = label_list[i] 
+        label = label_list[i % cols] 
         
         # 尝试使用系统字体，字体更大
         try:
@@ -61,7 +61,8 @@ def merge_images_grid(image_path, image_names, label_list, label_height, font_si
         x = (new_width - text_width) // 2
         y = (label_height - text_height) // 2
         
-        draw.text((x, y), label, fill='black', font=font)
+        if i < cols:
+            draw.text((x, y), label, fill='black', font=font)
         
         # 转换回numpy数组
         img_with_label = np.array(img_pil)
@@ -111,37 +112,38 @@ def merge_images_grid(image_path, image_names, label_list, label_height, font_si
     # 保存图像
     pil_image.save(output_path)
 
+def add_and_sort_images(image_names_sorted, image_path, sorted_indices):
+    
+    image_names = [f for f in os.listdir(image_path) if f.startswith('render_') and f.endswith('.png')]
+    # 获取当前目录下所有以render_开头的png文件
+    for index, image_name in enumerate(image_names):
+        if sorted_indices :
+            image_names_sorted.append(os.path.join(image_path, image_names[sorted_indices[index]]))
+        else:
+            image_names_sorted.append(os.path.join(image_path, image_name))
+            
 if __name__ == "__main__":
     
-    image_path = "render_pics"
-    
-    # 获取当前目录下所有以render_开头的png文件
-    image_names = [f for f in os.listdir(image_path) if f.startswith('render_') and f.endswith('.png')]
-
-    image_names_sorted = []
-    image_names_sorted.append(image_names[5])
-    image_names_sorted.append(image_names[4])
-    image_names_sorted.append(image_names[0])
-    image_names_sorted.append(image_names[1])
-    image_names_sorted.append(image_names[3])
-    image_names_sorted.append(image_names[2])
-    image_names_sorted.append(image_names[6])
-    
+    # 图像列的label名称
     label_list =[]
-    label_list.append("Raw Mesh")
-    label_list.append("DGCNN")
-    label_list.append("PointNext")
-    label_list.append("Geo-Net")
-    label_list.append("CrossTooth")
-    label_list.append("Ours")
-    label_list.append("Ground Truth")
-
+    name_list = ["Raw Mesh", "DGCNN", "PointNext", "Geo-Net", "CrossTooth", "Ours", "Ground Truth"]
+    for name in name_list:
+        label_list.append(name)
+        
+    image_files_sorted = []
+    add_and_sort_images(image_files_sorted,  "render_pics", sorted_indices=[5,4,0,1,3,2,6])
+    add_and_sort_images(image_files_sorted,  "render_pics_2", sorted_indices=None)
+    add_and_sort_images(image_files_sorted,  "render_pics_3", sorted_indices=None)
+    add_and_sort_images(image_files_sorted,  "render_pics_4", sorted_indices=None)
+    
+    
     output_file = "merged_rendered_images.png"
-    spacing = 80 # 图片之间的间距，单位为像素
-    label_height = 160  # 标签区域的高度
+    spacing = 50 # 图片之间的间距，单位为像素
+    label_height = 180  # 标签区域的高度
     font_size = 80  # 标签字体大小
     
-    merge_images_grid(image_path, image_names_sorted, 
-                      label_list, label_height, font_size,
-                      output_file, spacing, cols=len(image_names_sorted))
-    print(f"已合并 {len(image_names)} 张图片为2行3列网格，间距为 {spacing} 像素，输出文件: {output_file}")
+    merge_images_grid(image_files_sorted, label_list, label_height, font_size,
+                    output_file, spacing, cols=len(label_list))
+        
+        
+    print(f"已合并 {len(image_files_sorted)} 张图片为 {len(image_files_sorted) / len(label_list)} 行,  {len(label_list)} 列网格，间距为 {spacing} 像素，输出文件: {output_file}")
