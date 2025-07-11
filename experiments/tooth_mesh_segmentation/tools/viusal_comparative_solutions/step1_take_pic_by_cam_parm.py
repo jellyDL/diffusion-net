@@ -7,7 +7,7 @@ from datetime import datetime
 import json
 
 
-def capture_2d_view(ply_path, bg_color=[1.0, 1.0, 1.0]):
+def capture_2d_view(ply_path, cam_path, bg_color=[1.0, 1.0, 1.0]):
     """
     加载PLY文件并截取二维视图
     
@@ -57,7 +57,7 @@ def capture_2d_view(ply_path, bg_color=[1.0, 1.0, 1.0]):
     view_control = vis.get_view_control()
 
     # 从cam.json文件中获取相机参数
-    with open("cam.json", "r") as f:
+    with open(cam_path, "r") as f:
         cam_params = json.load(f)
     view_control.set_front(cam_params["trajectory"][0]["front"])
     view_control.set_lookat(cam_params["trajectory"][0]["lookat"])
@@ -115,7 +115,7 @@ def visual_mesh(mesh_path):
         print(f"发现 {white_count} 个白色顶点")
         
         # 将白色顶点设置为灰色
-        colors[white_mask] = [0.75, 0.75, 0.75]
+        colors[white_mask] = [0.6, 0.6, 0.6]
         
         # 更新网格的顶点颜色
         mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
@@ -155,19 +155,24 @@ def main():
         return
     
     type = 0
+    cam_path = "cam.json"
     if len(sys.argv) == 2:
         mesh_path = sys.argv[1]
         type = 1
     elif len(sys.argv) == 3:
         mesh_path = sys.argv[1]
         type = int(sys.argv[2])
+    elif len(sys.argv) == 4:
+        mesh_path = sys.argv[1]
+        type = int(sys.argv[2])
+        cam_path = sys.argv[3]
 
     print("type:", type)
         
     if type == 1:
         visual_mesh(mesh_path)
     elif type == 2:
-        capture_2d_view(mesh_path)
+        capture_2d_view(mesh_path, cam_path)
     else:
         print("错误: 未知的类型参数 {type}, 请使用 1 或 2。")
         return

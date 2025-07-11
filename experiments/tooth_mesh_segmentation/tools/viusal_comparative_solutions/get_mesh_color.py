@@ -129,9 +129,15 @@ def visualize_colors(color_info, ply_file):
         ax.add_patch(rect)
         
         # 添加RGB值和数量标签 - 调整位置向右移动
-        ax.text(1.1, len(color_counts_sorted)-i-0.5, 
+        ax.text(1.1, len(color_counts_sorted)-i-0.3, 
                 f'RGB({rgb[0]:.3f}, {rgb[1]:.3f}, {rgb[2]:.3f})', 
                 va='center', fontsize=6, fontweight='bold')
+        
+        # 修复格式化字符串错误，先计算值再格式化
+        rgb_255 = [val * 255.0 for val in rgb]
+        ax.text(1.1, len(color_counts_sorted)-i-0.5, 
+                f'RGB255({rgb_255[0]:.0f}, {rgb_255[1]:.0f}, {rgb_255[2]:.0f})', 
+                va='center', fontsize=6)
         
         ax.text(1.1, len(color_counts_sorted)-i-0.7, f'数量: {count}', 
                 va='center', fontsize=6)
@@ -145,10 +151,10 @@ def visualize_colors(color_info, ply_file):
     # 移除tight_layout，直接调整布局
     plt.subplots_adjust(left=0.15, right=0.95, top=0.9, bottom=0.1)
     
-    # 保存图表
-    output_image = f"{os.path.splitext(ply_file)[0]}_color_visualization.png"
-    plt.savefig(output_image, dpi=300, bbox_inches='tight')
-    print(f"颜色可视化图表已保存到: {output_image}")
+    # # 保存图表
+    # output_image = f"{os.path.splitext(ply_file)[0]}_color_visualization.png"
+    # plt.savefig(output_image, dpi=300, bbox_inches='tight')
+    # print(f"颜色可视化图表已保存到: {output_image}")
     
     plt.show()
 
@@ -172,21 +178,21 @@ def main():
             stats = color_info['color_statistics']
             print(f"唯一颜色数: {stats['unique_color_count']}")
             
-            # 保存颜色信息到文件
-            output_file = f"{os.path.splitext(ply_file)[0]}_color_info.txt"
-            with open(output_file, 'w') as f:
-                f.write(f"PLY文件: {ply_file}\n")
-                f.write(f"顶点总数: {color_info['vertex_count']}\n")
-                f.write(f"面片总数: {color_info['triangle_count']}\n")
-                f.write(f"唯一颜色数: {stats['unique_color_count']}\n\n")
+            # # 保存颜色信息到文件
+            # output_file = f"{os.path.splitext(ply_file)[0]}_color_info.txt"
+            # with open(output_file, 'w') as f:
+            #     f.write(f"PLY文件: {ply_file}\n")
+            #     f.write(f"顶点总数: {color_info['vertex_count']}\n")
+            #     f.write(f"面片总数: {color_info['triangle_count']}\n")
+            #     f.write(f"唯一颜色数: {stats['unique_color_count']}\n\n")
                 
-                f.write("所有唯一颜色及其出现次数:\n")
-                for i, color_stat in enumerate(stats['color_counts']):
-                    rgb = color_stat['rgb']
-                    count = color_stat['count']
-                    f.write(f"颜色 {i+1}: RGB({rgb[0]:.3f}, {rgb[1]:.3f}, {rgb[2]:.3f}) - 出现次数: {count}\n")
+            #     f.write("所有唯一颜色及其出现次数:\n")
+            #     for i, color_stat in enumerate(stats['color_counts']):
+            #         rgb = color_stat['rgb']
+            #         count = color_stat['count']
+            #         f.write(f"颜色 {i+1}: RGB({rgb[0]:.3f}, {rgb[1]:.3f}, {rgb[2]:.3f}) - 出现次数: {count}\n")
             
-            print(f"\n颜色信息已保存到: {output_file}")
+            # print(f"\n颜色信息已保存到: {output_file}")
             
             # 生成颜色可视化图表
             visualize_colors(color_info, ply_file)

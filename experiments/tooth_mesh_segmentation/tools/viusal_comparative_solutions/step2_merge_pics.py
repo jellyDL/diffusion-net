@@ -121,20 +121,21 @@ def add_and_sort_images(image_names_sorted, image_path, sorted_indices):
             image_names_sorted.append(os.path.join(image_path, image_names[sorted_indices[index]]))
         else:
             image_names_sorted.append(os.path.join(image_path, image_name))
+        print("{index} image_names: {image_name}")
             
 if __name__ == "__main__":
     
     # 图像列的label名称
     label_list =[]
-    name_list = ["Raw Mesh", "DGCNN", "PointNext", "Geo-Net", "CrossTooth", "Ours", "Ground Truth"]
+    name_list = ["DGCNN", "SimpSegNet", "Geo-Net", "CurSegNet", "TSegLab", "Ours", "Ground Truth"]
     for name in name_list:
         label_list.append(name)
         
     image_files_sorted = []
-    add_and_sort_images(image_files_sorted,  "render_pics", sorted_indices=[5,4,0,1,3,2,6])
-    add_and_sort_images(image_files_sorted,  "render_pics_2", sorted_indices=None)
-    add_and_sort_images(image_files_sorted,  "render_pics_3", sorted_indices=None)
-    add_and_sort_images(image_files_sorted,  "render_pics_4", sorted_indices=None)
+    add_and_sort_images(image_files_sorted,  "render_pics_1", sorted_indices=[0,6,2,5,4,3,1])
+    # add_and_sort_images(image_files_sorted,  "render_pics_2", sorted_indices=None)
+    # add_and_sort_images(image_files_sorted,  "render_pics_3", sorted_indices=None)
+    # add_and_sort_images(image_files_sorted,  "render_pics_4", sorted_indices=None)
     
     
     output_file = "merged_rendered_images.png"
