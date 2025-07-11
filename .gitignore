@@ -60,4 +60,5 @@ test_out
 *.pth
 
 *.png
+render_pics_*
 
