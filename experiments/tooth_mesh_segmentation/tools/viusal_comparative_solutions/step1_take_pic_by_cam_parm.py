@@ -7,7 +7,7 @@ from datetime import datetime
 import json
 
 
-def capture_2d_view(ply_path, cam_path, bg_color=[1.0, 1.0, 1.0]):
+def capture_2d_view(ply_path, cam_path, output_file, bg_color=[1.0, 1.0, 1.0]):
     """
     加载PLY文件并截取二维视图
     
@@ -84,11 +84,6 @@ def capture_2d_view(ply_path, cam_path, bg_color=[1.0, 1.0, 1.0]):
     if np.max(img_array) > 1.0 or np.min(img_array) < 0.0:
         img_array = np.clip(img_array, 0.0, 1.0)
     
-    # 生成输出文件名
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    file_basename = os.path.splitext(os.path.basename(ply_path))[0]
-    output_file = os.path.join("render_" + f"{file_basename}.png")
-    
     # 保存图像
     plt.imsave(output_file, img_array, dpi=600)
     print(f"已保存二维视图: {output_file}")
@@ -151,7 +146,9 @@ def visual_mesh(mesh_path):
 def main():
     
     if len(sys.argv) < 2:
-        print("用法: python step4_take_pic_by_cam_parm.py <ply_file> <type>")
+        print("用法1: python step1_take_pic_by_cam_parm.py <ply_file> 1")
+        print("用法2: python step1_take_pic_by_cam_parm.py <ply_file> 2 <cam_path>")
+        print("用法3: python step1_take_pic_by_cam_parm.py <ply_dir> 3")
         return
     
     type = 0
@@ -172,7 +169,19 @@ def main():
     if type == 1:
         visual_mesh(mesh_path)
     elif type == 2:
-        capture_2d_view(mesh_path, cam_path)
+        file_basename = os.path.splitext(os.path.basename(mesh_path))[0]
+        output_file = os.path.join("render_" + f"{file_basename}.png")
+        capture_2d_view(mesh_path, cam_path, output_file)
+    elif type == 3:
+        mesh_dir = mesh_path
+        out_dir = "render_pics_"+ mesh_dir.split("_")[-1]
+        cam_path = os.path.join(mesh_dir, "cam.json")
+        mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith('.ply')]
+        for mesh_file in mesh_files:
+            mesh_path = os.path.join(mesh_dir, mesh_file)
+            print(f"Processing {mesh_path} ...")
+            output_file = os.path.join(out_dir, "render_" + f"{mesh_file}.png")
+            capture_2d_view(mesh_path, cam_path, output_file)
     else:
         print("错误: 未知的类型参数 {type}, 请使用 1 或 2。")
         return

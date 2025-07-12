@@ -24,49 +24,8 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
         elif img.ndim == 2:  # 灰度图
             img = np.stack([img] * 3, axis=2)  # 转换为RGB
         
-        # 创建带有标签区域的新图像
-        new_height = img.shape[0] + label_height
-        new_width = img.shape[1]
-        
-        # 创建新的图像数组，上方为标签区域，下方为原图
-        if img.dtype == np.float32 or img.dtype == np.float64:
-            new_img = np.ones((new_height, new_width, 3), dtype=img.dtype)  # 白色背景
-            new_img[label_height:, :] = img  # 将原图放在下方
-            img_pil = Image.fromarray((new_img * 255).astype(np.uint8))
-        else:
-            new_img = np.ones((new_height, new_width, 3), dtype=np.uint8) * 255  # 白色背景
-            new_img[label_height:, :] = img  # 将原图放在下方
-            img_pil = Image.fromarray(new_img)
-        
-        # 添加标签到上方区域
-        draw = ImageDraw.Draw(img_pil)
-        # label = f"({chr(97 + i)})"  # (a), (b), (c), ...
-        label = label_list[i % cols] 
-        
-        # 尝试使用系统字体，字体更大
-        try:
-            font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", font_size)
-        except:
-            try:
-                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
-            except:
-                font = ImageFont.load_default()
-        
-        # 获取文本尺寸
-        bbox = draw.textbbox((0, 0), label, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        
-        # 在标签区域居中添加文字
-        x = (new_width - text_width) // 2
-        y = (label_height - text_height) // 2
-        
-        if i < cols:
-            draw.text((x, y), label, fill='black', font=font)
-        
-        # 转换回numpy数组
-        img_with_label = np.array(img_pil)
-        images.append(img_with_label)
+        # 添加原图而不添加标签
+        images.append(img)
     
     # 计算网格尺寸
     rows = (len(images) + cols - 1) // cols  # 向上取整
@@ -75,11 +34,13 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
     max_img_height = max(img.shape[0] for img in images)
     max_img_width = max(img.shape[1] for img in images)
     
-    # 计算总的画布尺寸
+    # 计算总的画布尺寸 - 增加底部标签区域和额外留白
     total_width = cols * max_img_width + (cols - 1) * spacing
-    total_height = rows * max_img_height + (rows - 1) * spacing
+    # 增加标签区域的高度，提供更多的底部留白
+    bottom_padding = label_height + 50  # 增加额外的50像素留白
+    total_height = rows * max_img_height + (rows - 1) * spacing + bottom_padding
     
-    # 创建最终的合并图像
+    # 创建最终的合并图像 - 增加底部标签区域
     if images[0].dtype == np.float64 or images[0].dtype == np.float32:
         merged_image = np.ones((total_height, total_width, 3), dtype=np.float32)
     else:
@@ -98,31 +59,61 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
         h, w = img.shape[:2]
         merged_image[y_start:y_start + h, x_start:x_start + w] = img
     
-    # 保存合并后的图像
-    # 将numpy数组转换为PIL图像以调整饱和度
+    # 将numpy数组转换为PIL图像
     if merged_image.dtype == np.float32 or merged_image.dtype == np.float64:
         pil_image = Image.fromarray((merged_image * 255).astype(np.uint8))
     else:
         pil_image = Image.fromarray(merged_image)
     
+    # 添加底部标签
+    draw = ImageDraw.Draw(pil_image)
+    
+    # 尝试使用系统字体
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", font_size)
+    except:
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
+        except:
+            font = ImageFont.load_default()
+    
+    # 在底部添加标签，位置上移以留出更多底部空间
+    label_y = rows * max_img_height + (rows - 1) * spacing + (label_height // 4)
+    for col, label in enumerate(label_list[:cols]):
+        # 获取文本尺寸
+        bbox = draw.textbbox((0, 0), label, font=font)
+        text_width = bbox[2] - bbox[0]
+        
+        # 计算每列的标签位置
+        label_x = col * (max_img_width + spacing) + (max_img_width - text_width) // 2
+        
+        # 添加文字
+        draw.text((label_x, label_y), label, fill='black', font=font)
+    
     # 降低饱和度
     enhancer = ImageEnhance.Color(pil_image)
-    pil_image = enhancer.enhance(0.5)  # 0.7表示保留70%的饱和度
+    pil_image = enhancer.enhance(0.5)  # 0.5表示保留50%的饱和度
     
     # 保存图像
     pil_image.save(output_path)
 
 def add_and_sort_images(image_names_sorted, image_path, sorted_indices):
     
-    image_names = [f for f in os.listdir(image_path) if f.startswith('render_') and f.endswith('.png')]
-    # 获取当前目录下所有以render_开头的png文件
-    for index, image_name in enumerate(image_names):
-        if sorted_indices :
-            image_names_sorted.append(os.path.join(image_path, image_names[sorted_indices[index]]))
+    end_wish_list = ["DGCNN", "SimpSegNet", "Geo-Net", "CurSegNet", "TSegLab", "Ours", "GT"]
+    # 按照end_wish_list的顺序，依次从image_path获取到图片，添加到image_names_sorted
+    for name in end_wish_list:
+        # 获取当前目录下所有包含name的png文件
+        image_names = [f for f in os.listdir(image_path) if f.find(name)!=-1 and f.endswith('.png')]
+        if not image_names:
+            print(f"没有找到包含 '{name}' 的图片，请检查目录: {image_path}")
+            # append 一张空白黑图
+            empty_image = np.zeros((200, 200, 3), dtype=np.uint8)
+            empty_image_pil = Image.fromarray(empty_image)
+            empty_image_pil.save(os.path.join(image_path, f"{name}_empty.png"))
+            image_names_sorted.append(os.path.join(image_path, f"{name}_empty.png"))
         else:
-            image_names_sorted.append(os.path.join(image_path, image_name))
-        print("{index} image_names: {image_name}")
-            
+            image_names_sorted.append(os.path.join(image_path, image_names[0]))
+
 if __name__ == "__main__":
     
     # 图像列的label名称
@@ -133,15 +124,15 @@ if __name__ == "__main__":
         
     image_files_sorted = []
     add_and_sort_images(image_files_sorted,  "render_pics_1", sorted_indices=[0,6,2,5,4,3,1])
-    # add_and_sort_images(image_files_sorted,  "render_pics_2", sorted_indices=None)
+    add_and_sort_images(image_files_sorted,  "render_pics_2", sorted_indices=None)
     # add_and_sort_images(image_files_sorted,  "render_pics_3", sorted_indices=None)
     # add_and_sort_images(image_files_sorted,  "render_pics_4", sorted_indices=None)
     
     
     output_file = "merged_rendered_images.png"
-    spacing = 50 # 图片之间的间距，单位为像素
-    label_height = 180  # 标签区域的高度
-    font_size = 80  # 标签字体大小
+    spacing = 2  # 减小图片之间的间距，从5降低到2
+    label_height = 160  # 标签区域的高度
+    font_size = 120  # 标签字体大小
     
     merge_images_grid(image_files_sorted, label_list, label_height, font_size,
                     output_file, spacing, cols=len(label_list))
