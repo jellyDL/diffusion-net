@@ -41,29 +41,35 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
     max_img_height = max(img.shape[0] for img in images)
     max_img_width = max(img.shape[1] for img in images)
     
-    # 计算总的画布尺寸 - 使用垂直间距
+    # 改回使用vertical_spacing参数
+    # 计算总的画布尺寸
     total_width = cols * max_img_width + (cols - 1) * spacing
     top_padding = label_height + 20  # 顶部标签区域加一些额外空间
-    total_height = rows * max_img_height + (rows - 1) * vertical_spacing + top_padding
     
-    # 创建最终的合并图像 - 包含顶部标签区域
+    # 计算总高度，使用vertical_spacing
+    total_height = top_padding + max_img_height * rows + vertical_spacing * (rows - 1)
+    
+    # 创建最终的合并图像
     if images[0].dtype == np.float64 or images[0].dtype == np.float32:
         merged_image = np.ones((total_height, total_width, 3), dtype=np.float32)
     else:
         merged_image = np.ones((total_height, total_width, 3), dtype=np.uint8) * 255
     
-    # 将每张图片放置到网格中，考虑顶部标签区域的偏移，使用垂直间距
+    # 将每张图片放置到网格中，使用vertical_spacing
     for i, img in enumerate(images):
         row = i // cols
         col = i % cols
         
-        # 计算位置，使用垂直间距
+        # 计算位置，使用vertical_spacing
         y_start = top_padding + row * (max_img_height + vertical_spacing)
         x_start = col * (max_img_width + spacing)
         
         # 放置图片
         h, w = img.shape[:2]
-        merged_image[y_start:y_start + h, x_start:x_start + w] = img
+        # 确保不会越界
+        y_end = min(y_start + h, total_height)
+        x_end = min(x_start + w, total_width)
+        merged_image[y_start:y_end, x_start:x_end] = img[:y_end-y_start, :x_end-x_start]
     
     # 将numpy数组转换为PIL图像
     if merged_image.dtype == np.float32 or merged_image.dtype == np.float64:
@@ -132,19 +138,18 @@ if __name__ == "__main__":
     add_and_sort_images(image_files_sorted,  "render_pics_1", sorted_indices=[0,6,2,5,4,3,1])
     add_and_sort_images(image_files_sorted,  "render_pics_2", sorted_indices=None)
     add_and_sort_images(image_files_sorted,  "render_pics_3", sorted_indices=None)
-    add_and_sort_images(image_files_sorted,  "render_pics_5", sorted_indices=None)
+    add_and_sort_images(image_files_sorted,  "render_pics_4", sorted_indices=None)
     # add_and_sort_images(image_files_sorted,  "render_pics_4", sorted_indices=None)
     
     
     output_file = "merged_rendered_images.png"
     spacing = 2  # 横向间距
-    vertical_spacing = 1  # 新增：垂直方向的间距，设置为比横向更小的值
-    label_height = 140  # 标签区域的高度
+    vertical_spacing = -150  # 设置为明显的负值，让图片产生重叠
+    label_height = 160  # 标签区域的高度
     font_size = 120  # 标签字体大小
     
     # 修改调用函数，传入垂直间距参数
     merge_images_grid(image_files_sorted, label_list, label_height, font_size,
-                    output_file, spacing, vertical_spacing, cols=len(label_list))
-        
+                    output_file, spacing, vertical_spacing, cols=len(label_list)) 
         
     print(f"已合并 {len(image_files_sorted)} 张图片为 {len(image_files_sorted) / len(label_list)} 行,  {len(label_list)} 列网格，间距为 {spacing} 像素，输出文件: {output_file}")
