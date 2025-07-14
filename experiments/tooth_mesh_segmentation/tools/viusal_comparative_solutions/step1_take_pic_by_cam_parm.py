@@ -5,9 +5,67 @@ import sys
 import matplotlib.pyplot as plt
 from datetime import datetime
 import json
+from PIL import Image, ImageDraw, ImageFont
 
+def draw_on_image(image_file, draw_path):
+    # 解析 draw.json 文件
+    if not os.path.exists(draw_path):
+        print(f"错误: 找不到标记文件 {draw_path}")
+        return  
+    with open(draw_path, 'r') as f:
+        draw_data = json.load(f)
+        print(f"读取标记数据: {draw_data}")
+    
+    img = Image.open(image_file)
+    draw = ImageDraw.Draw(img)
+    width, height = img.size
+        
+    if draw_data["ellipses"]:
+        items = draw_data["ellipses"]
+        for item in items:
+            boundingbox_W = int(item["boundingbox_W"])
+            boundingbox_H = int(item["boundingbox_H"])
+            boundingbox_X = int(item["boundingbox_X"])
+            boundingbox_Y = int(item["boundingbox_Y"])
+            boundingbox_Rotate = int(item["boundingbox_Rotate"])
+            boundingbox_LineW = int(item["boundingbox_LineW"])
 
-def capture_2d_view(ply_path, cam_path, output_file, bg_color=[1.0, 1.0, 1.0]):
+            left = boundingbox_X - int(boundingbox_W / 2)
+            right = boundingbox_X + int(boundingbox_W / 2)
+            top = boundingbox_Y - int(boundingbox_H / 2)
+            bottom = boundingbox_Y + int(boundingbox_H / 2)
+    
+            # ellipse_bbox = (left, top, right, bottom)，表示椭圆的外接矩形坐标
+            ellipse_bbox = (left, top, right, bottom)
+    
+            # 计算椭圆中心点
+            center_x = boundingbox_X
+            center_y = boundingbox_Y
+    
+            # 创建一个新图像用于旋转
+            transparent = Image.new('RGBA', img.size, (0, 0, 0, 0))
+            draw_transparent = ImageDraw.Draw(transparent)
+            
+            # 在透明层上绘制虚线椭圆
+            for angle in range(0, 360, 10):  # Draw dash every 10 degrees
+                start_angle = angle
+                end_angle = angle + 5  # 5 degrees per dash
+                draw_transparent.arc(ellipse_bbox, start=start_angle, end=end_angle, 
+                                    fill="red", width=boundingbox_LineW)
+            
+            # 旋转透明层 (顺时针旋转30度，所以用-30)
+            rotated = transparent.rotate(boundingbox_Rotate, 
+                                         center=(center_x, center_y), expand=False)
+            
+            # 将旋转后的椭圆合并到原图
+            img = img.convert('RGBA')
+            img = Image.alpha_composite(img, rotated)
+            img = img.convert('RGB')  # 转回RGB模式保存
+            
+            img.save(image_file)
+            print(f"已在图像上添加旋转30度的虚线椭圆标记: {image_file}") 
+    
+def capture_2d_view(ply_path, cam_path, output_file, draw_path=None, bg_color=[1.0, 1.0, 1.0]):
     """
     加载PLY文件并截取二维视图
     
@@ -36,7 +94,7 @@ def capture_2d_view(ply_path, cam_path, output_file, bg_color=[1.0, 1.0, 1.0]):
         print(f"发现 {white_count} 个白色顶点")
         
         # 将白色顶点设置为灰色
-        colors[white_mask] = [0.75, 0.75, 0.75]
+        colors[white_mask] = [0.6, 0.6, 0.6]
         
         # 更新网格的顶点颜色
         mesh.vertex_colors = o3d.utility.Vector3dVector(colors)
@@ -91,6 +149,8 @@ def capture_2d_view(ply_path, cam_path, output_file, bg_color=[1.0, 1.0, 1.0]):
     # 不关闭可视化器，保持窗口可交互
     # vis.run()  # 允许用户通过鼠标交互旋转、缩放等, 获取视角参数
     vis.destroy_window()
+    
+    draw_on_image(output_file, draw_path)
     
     return True
 
@@ -176,12 +236,13 @@ def main():
         mesh_dir = mesh_path
         out_dir = "render_pics_"+ mesh_dir.split("_")[-1]
         cam_path = os.path.join(mesh_dir, "cam.json")
+        draw_path = os.path.join(mesh_dir, "draw.json")  
         mesh_files = [f for f in os.listdir(mesh_dir) if f.endswith('.ply')]
         for mesh_file in mesh_files:
             mesh_path = os.path.join(mesh_dir, mesh_file)
             print(f"Processing {mesh_path} ...")
             output_file = os.path.join(out_dir, "render_" + f"{mesh_file}.png")
-            capture_2d_view(mesh_path, cam_path, output_file)
+            capture_2d_view(mesh_path, cam_path, output_file, draw_path)
     else:
         print("错误: 未知的类型参数 {type}, 请使用 1 或 2。")
         return
