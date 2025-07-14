@@ -3,16 +3,23 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
-def merge_images_grid(image_files, label_list, label_height, font_size, output_path, spacing=5, cols=3):
+def merge_images_grid(image_files, label_list, label_height, font_size, output_path, spacing=5, vertical_spacing=None, cols=3):
     """
     将多张图片按网格排布并保存为一张整图。
 
-    :param image_path: 图片文件夹路径
-    :param image_names: 图片文件名列表
+    :param image_files: 图片文件列表
+    :param label_list: 标签列表
+    :param label_height: 标签区域高度
+    :param font_size: 字体大小
     :param output_path: 输出文件路径
-    :param spacing: 图片之间的间距，单位为像素
+    :param spacing: 图片之间的水平间距，单位为像素
+    :param vertical_spacing: 图片之间的垂直间距，单位为像素
     :param cols: 每行图片数量
     """
+    # 如果未指定垂直间距，则使用水平间距
+    if vertical_spacing is None:
+        vertical_spacing = spacing
+    
     images = []
     
     for i, image_file in enumerate(image_files):
@@ -34,25 +41,24 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
     max_img_height = max(img.shape[0] for img in images)
     max_img_width = max(img.shape[1] for img in images)
     
-    # 计算总的画布尺寸 - 增加底部标签区域和额外留白
+    # 计算总的画布尺寸 - 使用垂直间距
     total_width = cols * max_img_width + (cols - 1) * spacing
-    # 增加标签区域的高度，提供更多的底部留白
-    bottom_padding = label_height + 50  # 增加额外的50像素留白
-    total_height = rows * max_img_height + (rows - 1) * spacing + bottom_padding
+    top_padding = label_height + 20  # 顶部标签区域加一些额外空间
+    total_height = rows * max_img_height + (rows - 1) * vertical_spacing + top_padding
     
-    # 创建最终的合并图像 - 增加底部标签区域
+    # 创建最终的合并图像 - 包含顶部标签区域
     if images[0].dtype == np.float64 or images[0].dtype == np.float32:
         merged_image = np.ones((total_height, total_width, 3), dtype=np.float32)
     else:
         merged_image = np.ones((total_height, total_width, 3), dtype=np.uint8) * 255
     
-    # 将每张图片放置到网格中
+    # 将每张图片放置到网格中，考虑顶部标签区域的偏移，使用垂直间距
     for i, img in enumerate(images):
         row = i // cols
         col = i % cols
         
-        # 计算位置
-        y_start = row * (max_img_height + spacing)
+        # 计算位置，使用垂直间距
+        y_start = top_padding + row * (max_img_height + vertical_spacing)
         x_start = col * (max_img_width + spacing)
         
         # 放置图片
@@ -65,7 +71,7 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
     else:
         pil_image = Image.fromarray(merged_image)
     
-    # 添加底部标签
+    # 添加顶部标签
     draw = ImageDraw.Draw(pil_image)
     
     # 尝试使用系统字体
@@ -77,8 +83,8 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
         except:
             font = ImageFont.load_default()
     
-    # 在底部添加标签，位置上移以留出更多底部空间
-    label_y = rows * max_img_height + (rows - 1) * spacing + (label_height // 4)
+    # 在顶部添加标签
+    label_y = label_height // 3  # 位置在顶部区域
     for col, label in enumerate(label_list[:cols]):
         # 获取文本尺寸
         bbox = draw.textbbox((0, 0), label, font=font)
@@ -125,17 +131,20 @@ if __name__ == "__main__":
     image_files_sorted = []
     add_and_sort_images(image_files_sorted,  "render_pics_1", sorted_indices=[0,6,2,5,4,3,1])
     add_and_sort_images(image_files_sorted,  "render_pics_2", sorted_indices=None)
-    # add_and_sort_images(image_files_sorted,  "render_pics_3", sorted_indices=None)
+    add_and_sort_images(image_files_sorted,  "render_pics_3", sorted_indices=None)
+    add_and_sort_images(image_files_sorted,  "render_pics_5", sorted_indices=None)
     # add_and_sort_images(image_files_sorted,  "render_pics_4", sorted_indices=None)
     
     
     output_file = "merged_rendered_images.png"
-    spacing = 2  # 减小图片之间的间距，从5降低到2
-    label_height = 160  # 标签区域的高度
+    spacing = 2  # 横向间距
+    vertical_spacing = 1  # 新增：垂直方向的间距，设置为比横向更小的值
+    label_height = 140  # 标签区域的高度
     font_size = 120  # 标签字体大小
     
+    # 修改调用函数，传入垂直间距参数
     merge_images_grid(image_files_sorted, label_list, label_height, font_size,
-                    output_file, spacing, cols=len(label_list))
+                    output_file, spacing, vertical_spacing, cols=len(label_list))
         
         
     print(f"已合并 {len(image_files_sorted)} 张图片为 {len(image_files_sorted) / len(label_list)} 行,  {len(label_list)} 列网格，间距为 {spacing} 像素，输出文件: {output_file}")
