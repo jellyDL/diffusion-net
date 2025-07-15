@@ -153,7 +153,7 @@ for combination, values in training_curves.items():
     plt.plot(epochs, values['total_loss'], label=combination)
 # plt.xlabel('Epochs')
 # plt.ylabel('Total Loss')
-plt.title('(a) Total Loss Curves', fontweight='bold', y=-0.15)
+plt.title('(a) Total Loss Curves', fontweight='bold', y=-0.12)
 plt.legend()
 plt.grid(True)
 
@@ -163,7 +163,7 @@ for combination, values in training_curves.items():
     plt.plot(epochs, values['mIoU'], label=combination)
 # plt.xlabel('Epochs')
 # plt.ylabel('mIoU (%)')
-plt.title('(b) mIoU Curves', fontweight='bold', y=-0.15)
+plt.title('(b) mIoU Curves', fontweight='bold', y=-0.12)
 plt.legend()
 plt.grid(True)
 
@@ -173,7 +173,7 @@ for combination, values in training_curves.items():
     plt.plot(epochs, values['B_IoU'], label=combination)
 # plt.xlabel('Epochs')
 # plt.ylabel('B-IoU (%)')
-plt.title('(c) B-IoU Curves', fontweight='bold', y=-0.15)
+plt.title('(c) B-IoU Curves', fontweight='bold', y=-0.12)
 plt.legend()
 plt.grid(True)
 
