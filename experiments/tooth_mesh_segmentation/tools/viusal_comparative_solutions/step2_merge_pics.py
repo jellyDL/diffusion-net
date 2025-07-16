@@ -41,13 +41,12 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
     max_img_height = max(img.shape[0] for img in images)
     max_img_width = max(img.shape[1] for img in images)
     
-    # 改回使用vertical_spacing参数
-    # 计算总的画布尺寸
+    # 修改布局：计算总的画布尺寸，标签区域在底部而不是顶部
     total_width = cols * max_img_width + (cols - 1) * spacing
-    top_padding = label_height + 20  # 顶部标签区域加一些额外空间
+    bottom_padding = label_height + 20  # 底部标签区域加一些额外空间
     
     # 计算总高度，使用vertical_spacing
-    total_height = top_padding + max_img_height * rows + vertical_spacing * (rows - 1)
+    total_height = max_img_height * rows + vertical_spacing * (rows - 1) + bottom_padding
     
     # 创建最终的合并图像
     if images[0].dtype == np.float64 or images[0].dtype == np.float32:
@@ -55,19 +54,19 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
     else:
         merged_image = np.ones((total_height, total_width, 3), dtype=np.uint8) * 255
     
-    # 将每张图片放置到网格中，使用vertical_spacing
+    # 将每张图片放置到网格中，使用vertical_spacing，位置从顶部开始
     for i, img in enumerate(images):
         row = i // cols
         col = i % cols
         
-        # 计算位置，使用vertical_spacing
-        y_start = top_padding + row * (max_img_height + vertical_spacing)
+        # 计算位置，使用vertical_spacing，不需要顶部填充
+        y_start = row * (max_img_height + vertical_spacing)
         x_start = col * (max_img_width + spacing)
         
         # 放置图片
         h, w = img.shape[:2]
         # 确保不会越界
-        y_end = min(y_start + h, total_height)
+        y_end = min(y_start + h, total_height - bottom_padding)
         x_end = min(x_start + w, total_width)
         merged_image[y_start:y_end, x_start:x_end] = img[:y_end-y_start, :x_end-x_start]
     
@@ -89,8 +88,9 @@ def merge_images_grid(image_files, label_list, label_height, font_size, output_p
         except:
             font = ImageFont.load_default()
     
-    # 在顶部添加标签
-    label_y = label_height // 3  # 位置在顶部区域
+    # 在底部添加标签而不是顶部
+    # 计算标签的y坐标位置：图片部分的底部加上一些间距
+    label_y = max_img_height * rows + vertical_spacing * (rows - 1) + bottom_padding // 3 - 40 
     for col, label in enumerate(label_list[:cols]):
         # 获取文本尺寸
         bbox = draw.textbbox((0, 0), label, font=font)
