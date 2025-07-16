@@ -1,12 +1,12 @@
 {
     "ellipses": [
         {
-            "boundingbox_W": 300,
-            "boundingbox_H": 500,
-            "boundingbox_X": 1040,
-            "boundingbox_Y": 700,
-            "boundingbox_Rotate": 6,
-            "boundingbox_LineW": 8
+            "boundingbox_W": 380,
+            "boundingbox_H": 600,
+            "boundingbox_X": 1070,
+            "boundingbox_Y": 770,
+            "boundingbox_Rotate": 5,
+            "boundingbox_LineW": 15
         }
     ]
 }

@@ -1,20 +1,20 @@
 {
     "ellipses": [
         {
-            "boundingbox_W": 200,
-            "boundingbox_H": 280,
-            "boundingbox_X": 330,
-            "boundingbox_Y": 455,
+            "boundingbox_W": 250,
+            "boundingbox_H": 290,
+            "boundingbox_X": 260,
+            "boundingbox_Y": 480,
             "boundingbox_Rotate": -28,
-            "boundingbox_LineW": 8
+            "boundingbox_LineW": 15
         },
         {
-            "boundingbox_W": 230,
-            "boundingbox_H": 310,
-            "boundingbox_X": 1030,
-            "boundingbox_Y": 620,
-            "boundingbox_Rotate": 25,
-            "boundingbox_LineW": 8
+            "boundingbox_W": 300,
+            "boundingbox_H": 400,
+            "boundingbox_X": 1050,
+            "boundingbox_Y": 650,
+            "boundingbox_Rotate": 20,
+            "boundingbox_LineW": 15
         }
     ]
 }
