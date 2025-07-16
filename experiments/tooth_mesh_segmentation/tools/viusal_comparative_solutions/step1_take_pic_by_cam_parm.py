@@ -150,7 +150,8 @@ def capture_2d_view(ply_path, cam_path, output_file, draw_path=None, bg_color=[1
     # vis.run()  # 允许用户通过鼠标交互旋转、缩放等, 获取视角参数
     vis.destroy_window()
     
-    draw_on_image(output_file, draw_path)
+    if draw_path != None and os.path.exists(draw_path):
+        draw_on_image(output_file, draw_path)
     
     return True
 
