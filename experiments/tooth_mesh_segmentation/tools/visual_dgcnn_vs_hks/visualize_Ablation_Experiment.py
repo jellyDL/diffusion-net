@@ -80,7 +80,49 @@ def capture_view(ply_file, camera_json_path, outfile="mesh_view.png"):
     vis.capture_screen_image(outfile, do_render=True)
     vis.destroy_window()
     print(f"已保存视图截图为 mesh_view.png (分辨率: {width}x{height})")
+ 
+def draw_ellipse_on_image(img, w, h, x, y, rotate=0, line_w=15):
+    boundingbox_W = w
+    boundingbox_H = h
+    boundingbox_X = x
+    boundingbox_Y = y
+    boundingbox_Rotate = rotate  # 旋转角度
+    boundingbox_LineW = line_w
     
+    left = boundingbox_X - int(boundingbox_W / 2)
+    right = boundingbox_X + int(boundingbox_W / 2)
+    top = boundingbox_Y - int(boundingbox_H / 2)
+    bottom = boundingbox_Y + int(boundingbox_H / 2)
+     
+    ellipse_bbox = (left, top, right, bottom)
+    
+    # 计算椭圆中心点
+    center_x = boundingbox_X
+    center_y = boundingbox_Y
+    
+    # 创建一个新图像用于旋转
+    transparent = Image.new('RGBA', img.size, (0, 0, 0, 0))
+    draw_transparent = ImageDraw.Draw(transparent)
+     
+     # 在透明层上绘制虚线椭圆
+    for angle in range(0, 360, 10):  # Draw dash every 10 degrees
+        start_angle = angle
+        end_angle = angle + 5  # 5 degrees per dash
+        draw_transparent.arc(ellipse_bbox, start=start_angle, end=end_angle, 
+                            fill="red", width=boundingbox_LineW)
+    
+    # 旋转透明层 (顺时针旋转30度，所以用-30)
+    rotated = transparent.rotate(boundingbox_Rotate, 
+                                    center=(center_x, center_y), expand=False)
+    
+    img = img.convert('RGBA')
+    img = Image.alpha_composite(img, rotated)
+    img = img.convert('RGB')  # 转回RGB模式保存
+    img.save("aa.jpg")
+    
+    return img
+    
+            
 def run_capture_mode(ply_path, camera_json_path):
     
     # 遍历 ply_path 中的所有 PLY 文件
@@ -102,6 +144,20 @@ def run_capture_mode(ply_path, camera_json_path):
         bad_case = Image.open("BadCase.png")      
         process = Image.open("Process.png")
         ground_truth = Image.open("GroundTruth.png")
+        
+        w = 500
+        h = 500
+        x = 500
+        y = 520   
+        
+        # w = 450
+        # h = 450
+        # x = 480
+        # y = 450        
+        
+        bad_case = draw_ellipse_on_image(bad_case, w, h, x, y)
+        process = draw_ellipse_on_image(process, w, h, x, y)
+        ground_truth = draw_ellipse_on_image(ground_truth, w, h, x, y)
         
         # 为文字添加额外的空间，增加高度以适应更大字体
         text_height = 100  # 增加文字区域高度
@@ -134,46 +190,52 @@ def run_capture_mode(ply_path, camera_json_path):
                 except:
                     font = ImageFont.load_default()
         
-        # 在各个图像位置上方添加文字，居中对齐
-        # 计算每张图片的中心位置
-        x1_center = bad_case.width // 2
-        x2_center = bad_case.width + process.width // 2
-        x3_center = bad_case.width + process.width + ground_truth.width // 2
-        
-        # 文字内容
-        text1 = "DGCNN (single-branch)"
-        text2 = "DGCNN + HKS (dual-branch)"
-        text3 = "Ground Truth"
-        
-        # 获取文本边界框来居中显示
-        try:
-            # 使用textbbox计算文本宽度（需要较新版本的PIL）
-            text1_bbox = draw.textbbox((0, 0), text1, font=font)
-            text2_bbox = draw.textbbox((0, 0), text2, font=font)
-            text3_bbox = draw.textbbox((0, 0), text3, font=font)
+            # 先将三张图片粘贴到新图像中
+            combined_image.paste(bad_case, (0, 0))
+            combined_image.paste(process, (bad_case.width, 0))
+            combined_image.paste(ground_truth, (bad_case.width + process.width, 0))
             
-            text1_width = text1_bbox[2] - text1_bbox[0]
-            text2_width = text2_bbox[2] - text2_bbox[0]
-            text3_width = text3_bbox[2] - text3_bbox[0]
-        except AttributeError:
-            # 兼容旧版PIL，估算文本宽度
-            text1_width = len(text1) * font_size // 2
-            text2_width = len(text2) * font_size // 2
-            text3_width = len(text3) * font_size // 2
-        
-        # 居中绘制文字
-        draw.text((x1_center - text1_width // 2, text_height // 4), text1, fill=(0, 0, 0), font=font)
-        draw.text((x2_center - text2_width // 2, text_height // 4), text2, fill=(0, 0, 0), font=font)
-        draw.text((x3_center - text3_width // 2, text_height // 4), text3, fill=(0, 0, 0), font=font)
-      
-        # 将三张图片粘贴到新图像中，位置在文字下方
-        combined_image.paste(bad_case, (0, text_height))
-        combined_image.paste(process, (bad_case.width, text_height))
-        combined_image.paste(ground_truth, (bad_case.width + process.width, text_height))
-        
-        # 保存合并后的图像
-        combined_image.save("CombinedView.png")
-        print("已保存合并图像为 CombinedView.png")
+            # 计算每张图片的中心位置
+            x1_center = bad_case.width // 2
+            x2_center = bad_case.width + process.width // 2
+            x3_center = bad_case.width + process.width + ground_truth.width // 2
+            
+            # 文字内容
+            text1 = "(a) HKS (single-branch)"
+            text2 = "(b) DGCNN + HKS (dual-branch)"
+            text3 = "(c) Ground Truth"
+            
+            # text1 = "(a) DGCNN (single-branch)"
+            # text2 = "(b) DGCNN + HKS (dual-branch)"
+            # text3 = "(c) Ground Truth"
+            
+            # 文字位置在图片下方
+            y_text = max(bad_case.height, process.height, ground_truth.height) + text_height // 4
+            
+            # 获取文本边界框来居中显示
+            try:
+                # 使用textbbox计算文本宽度（需要较新版本的PIL）
+                text1_bbox = draw.textbbox((0, 0), text1, font=font)
+                text2_bbox = draw.textbbox((0, 0), text2, font=font)
+                text3_bbox = draw.textbbox((0, 0), text3, font=font)
+                
+                text1_width = text1_bbox[2] - text1_bbox[0]
+                text2_width = text2_bbox[2] - text2_bbox[0]
+                text3_width = text3_bbox[2] - text3_bbox[0]
+            except AttributeError:
+                # 兼容旧版PIL，估算文本宽度
+                text1_width = len(text1) * font_size // 2
+                text2_width = len(text2) * font_size // 2
+                text3_width = len(text3) * font_size // 2
+            
+            # 居中绘制文字（在图片下方）
+            draw.text((x1_center - text1_width // 2, y_text), text1, fill=(0, 0, 0), font=font)
+            draw.text((x2_center - text2_width // 2, y_text), text2, fill=(0, 0, 0), font=font)
+            draw.text((x3_center - text3_width // 2, y_text), text3, fill=(0, 0, 0), font=font)
+            
+            # 保存合并后的图像
+            combined_image.save("CombinedView.png")
+            print("已保存合并图像为 CombinedView.png")
     except Exception as e:
         print(f"合并图像时出错: {e}")
 
